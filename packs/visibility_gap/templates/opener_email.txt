@@ -1,0 +1,10 @@
+Hi {contact_greeting},
+
+I was looking for a {trade} in {city} and came across {business_name}. A few things stood out:
+
+{findings}
+
+I put together a short, free Visibility Audit for {business_name} that shows where you appear (and don't) compared with other {trade} businesses nearby. Happy to send it over if useful.
+
+{operator_name}
+{operator_phone}

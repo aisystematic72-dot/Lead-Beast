@@ -1,0 +1,30 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: lb, POSTGRES_PASSWORD: lb, POSTGRES_DB: lb_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lb" --health-interval 5s --health-retries 10
+    env:
+      LB_ENVIRONMENT: test
+      LB_TEST_DATABASE_URL: postgresql+psycopg://lb:lb@localhost:5432/lb_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: lint-imports
+      - run: >
+          mypy src/leadbeast/domain src/leadbeast/evidence/fold.py src/leadbeast/evidence/facts.py
+          src/leadbeast/scoring/engine.py src/leadbeast/scoring/parts.py src/leadbeast/scoring/gates.py
+          src/leadbeast/scoring/gaps.py src/leadbeast/scoring/problems.py src/leadbeast/policy/engine.py
+          src/leadbeast/cost/budget.py --follow-imports=silent
+      - run: pytest -q
+      - name: secrets scan
+        run: "! grep -rEn '(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{32,}|xox[bp]-[A-Za-z0-9-]+)' src packs deploy"

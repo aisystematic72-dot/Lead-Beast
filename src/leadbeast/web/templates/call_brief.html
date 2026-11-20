@@ -1,0 +1,100 @@
+{% extends "base.html" %}{% block title %}{{ b.name }} · Call brief{% endblock %}
+{% block content %}
+<div class="call-nav">
+  <a class="back" href="/calls">&larr; Call list</a>
+  <span class="small muted">Business {{ pos }} of {{ total }}</span>
+  <span class="actions">
+    {% if prev %}<a class="btn btn-sm" href="/calls/{{ prev.id }}" title="{{ prev.name }}">&larr; Previous</a>{% endif %}
+    {% if next %}<a class="btn btn-sm" href="/calls/{{ next.id }}" title="{{ next.name }}">Next &rarr;</a>{% endif %}
+  </span>
+</div>
+
+<header class="biz-head">
+  <div>
+    <div class="title"><h1>{{ b.name }}</h1><span class="chip lvl-{{ b.level|lower }}">{{ b.level }} opportunity</span></div>
+    <div class="meta">{{ b.trade|humanize or 'Trade unknown' }}{{ ' · ' ~ b.address if b.address }}</div>
+  </div>
+  <div class="actions">
+    {% if b.phone %}<a class="btn btn-primary btn-lg call-btn" href="tel:{{ b.phone_tel }}">Call {{ b.phone }}</a>{% endif %}
+    {% if b.email %}<a class="btn" href="mailto:{{ b.email }}">Email</a>{% endif %}
+    {% if b.website %}<a class="btn" href="{{ b.website }}" target="_blank" rel="noopener">Website</a>{% endif %}
+    {% if b.facebook %}<a class="btn" href="{{ b.facebook }}" target="_blank" rel="noopener">Facebook</a>{% endif %}
+    {% if b.instagram %}<a class="btn" href="{{ b.instagram }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
+  </div>
+</header>
+
+{% for t in b.tips %}<div class="flash bad">{{ t }}</div>{% endfor %}
+
+<section class="tiles quick" aria-label="At a glance">
+  <div class="tile"><div class="k">Ask for</div><div class="v">{{ b.owner or 'The owner' }}</div>
+    <div class="d">{{ 'Owner or licence holder' if b.owner else 'Name not on file' }}</div></div>
+  <div class="tile"><div class="k">In business</div><div class="v">{{ (b.years ~ ' years') if b.years else 'Unknown' }}</div>
+    <div class="d">{{ (b.staff ~ ' staff') if b.staff else 'Small local business' }}</div></div>
+  <div class="tile"><div class="k">Open and real</div><div class="v">{{ b.verified }}</div>
+    <div class="d">{{ 'Checked by our team' if b.verified != 'Not confirmed' else 'Confirm on the call' }}</div></div>
+  <div class="tile"><div class="k">Facebook</div><div class="v"><span class="chip fb-{{ b.fb_status }}">{{ FB_TEXT.get(b.fb_status, 'Not checked') }}</span></div>
+    <div class="d">{{ ('Last post ' ~ b.fb_last_post) if b.fb_last_post else ('No posts found' if b.fb_status in ['inactive', 'unavailable'] else '&nbsp;'|safe) }}</div></div>
+</section>
+
+<div class="cols">
+  <div class="col-main">
+    <section class="card">
+      <div class="card-title"><h2>What we noticed</h2><span class="note">Only things we checked ourselves</span></div>
+      {% if b.findings %}
+      <ol class="findings">
+        {% for f in b.findings %}
+        <li>
+          <div class="f-top"><span class="f-title">{{ f.title }}</span>{% if f.weight > 1 %}<span class="chip chip-sm gap-chip">Big one</span>{% endif %}</div>
+          <div class="f-detail">{{ f.detail }}</div>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="prose">No obvious gaps. Their online presence looks healthy, so pitch growth: more reach and more {{ 'patients' if b.trade == 'dental' else 'customers' }}.</div>
+      {% endif %}
+      {% if b.fb_summary %}<div class="note-box"><div class="t">Facebook check</div>{{ b.fb_summary }}</div>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-title"><h2>How we can help</h2><span class="note">What to offer, in this order</span></div>
+      <div class="tiles two">
+        {% for s in b.services %}
+        <div class="tile help"><div class="v">{{ s.name }}</div><div class="d">{{ s.pitch }}</div></div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <aside class="col-side">
+    <section class="card script">
+      <h2>What to say</h2>
+      <div><div class="step-k">1. Open</div><p>{{ b.script.opener }}</p></div>
+      {% if b.script.points %}
+      <div><div class="step-k">2. Point out</div>
+        <ul>{% for p in b.script.points %}<li>{{ p }}</li>{% endfor %}</ul></div>
+      {% endif %}
+      <div><div class="step-k">{{ 3 if b.script.points else 2 }}. Ask</div>
+        <ul>{% for q in b.script.questions %}<li>{{ q }}</li>{% endfor %}</ul></div>
+      <div><div class="step-k">{{ 4 if b.script.points else 3 }}. Close</div><p>{{ b.script.close }}</p></div>
+    </section>
+
+    {% if b.strengths %}
+    <section class="card" style="gap:10px">
+      <h2>Good to mention</h2>
+      <div class="chips">{% for s in b.strengths %}<span class="chip ok-chip">{{ s }}</span>{% endfor %}</div>
+      <div class="small muted">Open with a compliment. It makes the rest of the call easier.</div>
+    </section>
+    {% endif %}
+
+    <section class="card" style="gap:10px">
+      <h2>Contact details</h2>
+      <div class="kv">
+        <div><span class="muted">Phone</span><span class="val">{% if b.phone %}<a class="link" href="tel:{{ b.phone_tel }}">{{ b.phone }}</a>{% else %}None{% endif %}</span></div>
+        {% for p in b.other_phones %}<div><span class="muted">Other phone</span><span class="val">{{ p }}</span></div>{% endfor %}
+        <div><span class="muted">Email</span><span class="val">{% if b.email %}<a class="link" href="mailto:{{ b.email }}">{{ b.email }}</a>{% else %}None{% endif %}</span></div>
+        <div><span class="muted">Address</span><span class="val right">{{ b.address or 'Unknown' }}</span></div>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

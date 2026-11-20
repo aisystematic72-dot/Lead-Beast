@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% block title %}Panic Alerts · LeadBeast{% endblock %}
+{% block content %}
+{% set unread = ['pending','held','sent','digested'] %}
+<header class="page-head">
+  <div>
+    <h1>Panic Alerts</h1>
+    <div class="sub">LeadBeast watches around the clock. You decide the category once; it tells you the moment a business matches.</div>
+  </div>
+</header>
+
+<section class="kpis" aria-label="Summary" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+  <div class="kpi"><div class="l">Active watches</div><div class="v">{{ watches|selectattr('enabled')|list|length }}</div></div>
+  <div class="kpi"><div class="l">Unread alerts</div><div class="v red">{{ alerts|selectattr('0.status', 'in', unread)|list|length }}</div></div>
+  <div class="kpi"><div class="l">Unverified (digest only)</div><div class="v">{{ alerts|selectattr('0.unverified')|list|length }}</div></div>
+  <div class="kpi"><div class="l">Paused watches</div><div class="v">{{ watches|rejectattr('enabled')|list|length }}</div></div>
+</section>
+
+<div class="cols">
+  <section class="card flush col-main">
+    <div class="card-head"><h2>Inbox</h2><span class="note">Newest first</span></div>
+    <div>
+    {% for a, name in alerts %}{% set open = a.status in unread %}
+      <div class="alert-item {{ 'hot' if open and a.pressure >= 70 }} {{ 'done' if a.status in ('read','dismissed') }}">
+        <div class="top">
+          <div>
+            <div class="who">{{ name }}</div>
+            <div class="what">{{ a.event|replace('_', ' ')|humanize }}: {{ a.aspect|alert_reason }}{{ ' (unverified)' if a.unverified }}</div>
+          </div>
+          <span class="when">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        </div>
+        <div class="facts">
+          <span>Pressure {{ a.pressure }}, {{ a.direction }}</span>
+          <span>{{ a.evidence_ids|length }} piece{{ '' if a.evidence_ids|length == 1 else 's' }} of evidence</span>
+          <span>Status {{ a.status }}</span>
+        </div>
+        {% if a.status != 'dismissed' %}
+        <div class="actions" style="margin-top:2px">
+          <a class="btn btn-sm btn-primary" href="/business/{{ a.business_id }}">Open Business 360</a>
+        </div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="alert-item"><div class="prose">No alerts yet. Matches from your watches land here.</div></div>
+    {% endfor %}
+    </div>
+  </section>
+
+  <aside class="col-side" style="flex-basis:360px;gap:16px">
+    <section class="card">
+      <h2>Your watches</h2>
+      {% for w in watches %}
+      <div class="watch {{ '' if w.enabled else 'off' }}">
+        <div class="top"><div class="t">{{ w.name }}</div>
+          <div class="toggle {{ 'on' if w.enabled }}" role="img" aria-label="{{ 'On' if w.enabled else 'Paused' }}"><span></span></div></div>
+        {% if w.rule %}<div class="d">{{ w.rule|fmt }}</div>{% endif %}
+        <div class="d">{{ w.style|humanize }} · up to {{ w.cap_per_hour }} an hour, {{ w.cap_per_day }} a day{% if w.quiet_start and w.quiet_end %} · quiet {{ w.quiet_start.strftime('%H:%M') }} to {{ w.quiet_end.strftime('%H:%M') }} {{ w.tz }}{% endif %}</div>
+        {% if not w.enabled %}<div class="d">Paused</div>{% endif %}
+      </div>
+      {% else %}
+      <div class="prose">No watches yet. Create one with <code>lb watch add</code> or <code>POST /api/watches</code>.</div>
+      {% endfor %}
+    </section>
+
+    <section class="card" style="gap:8px">
+      <h2>Guardrails</h2>
+      <div style="font-size:13px;color:var(--ink2);line-height:1.55">Alerts reach you only. Nothing is sent to a business without your approval, and pressure never appears in a message. A watch under 90% precision goes to the digest, marked "unverified", not as an instant alert.</div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

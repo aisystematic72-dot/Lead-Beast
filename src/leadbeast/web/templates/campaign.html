@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}{{ c.name }} · LeadBeast{% endblock %}
+{% block content %}
+<a class="back" href="/campaigns/new">Back to Campaign Studio</a>
+<header class="page-head">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1>{{ c.name }}</h1><span class="chip grey-chip">{{ c.status|replace('_', ' ')|humanize }}</span></div>
+    <div class="sub">{{ c.area }} · {{ c.size_min }} to {{ c.size_max }} people · {{ pack.name|humanize }} pack v{{ pack.version }}</div>
+  </div>
+  <div class="actions"><a class="btn btn-primary" href="/opportunities?campaign={{ c.id }}">See opportunities</a></div>
+</header>
+
+<section class="tiles">
+  <div class="card" style="gap:6px"><div class="small muted">Offer</div><div class="strong" style="font-size:15px">{{ offer.name }}</div>
+    <div class="small muted">${{ '%.0f'|format(offer.monthly_fee|float) }} a month</div></div>
+  <div class="card" style="gap:6px"><div class="small muted">Payback</div><div class="big m" style="font-size:26px">{{ payback.multiple_low }}x to {{ payback.multiple_high }}x</div>
+    <div class="small muted">{{ payback.verdict }}{{ ', provisional' if payback.provisional }}</div></div>
+  <div class="card" style="gap:6px"><div class="small muted">Budget cap</div><div class="big m" style="font-size:26px">{{ c.budget_cap|money }}</div>
+    <div class="small muted">0 means free sources only</div></div>
+</section>
+
+<section class="card">
+  <div class="card-title"><h2>Launch Lab</h2><span class="note">Try a sample before a full run</span></div>
+  <div class="prose">Runs stages 1 to 6 on a sample and shows the class mix and projected cost before a full run. Use the CLI or API:</div>
+  <pre class="body">leadbeast campaign dry-run {{ c.id }} --source osm --sample 50
+leadbeast run collect {{ c.id }} --source osm</pre>
+</section>
+
+<div class="cols">
+  <section class="card col-half">
+    <h2>From found to won</h2>
+    {% set top = summary.funnel.collected or 1 %}
+    <div class="bars" style="gap:12px">
+      {% for k in ['collected','scored','qualified','drafted','sent','replied','won'] %}
+      <div class="bar-row"><div class="lab" style="font-size:13px"><span>{{ k|humanize }}</span><span>{{ summary.funnel[k] }}</span></div>
+        <div class="bar lg"><span style="width:{{ [(summary.funnel[k] / top * 100)|round, 100]|min }}%"></span></div></div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card col-half">
+    <h2>Priority class mix</h2>
+    {% set tot = (summary.class_mix.values()|sum) or 1 %}
+    <div class="bars" style="gap:12px">
+      {% for k in ['A','B','review','C','D'] %}{% set n = summary.class_mix.get(k, 0) %}
+      <div class="hbar"><span>{{ CLASS_LABELS[k] }}</span><div class="bar"><span class="{{ {'B':'b','C':'c','D':'d','review':'rv'}.get(k, '') }}" style="width:{{ (n / tot * 100)|round }}%"></span></div><span>{{ n }}</span></div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

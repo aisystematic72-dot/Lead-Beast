@@ -1,0 +1,44 @@
+{% set b = v.business %}{% set s = v.snapshot %}
+{% set cs = v.contacts|selectattr('eligible')|selectattr('phone_e164')|list %}
+{% set cphones = (cs|selectattr('confidence','equalto','high')|list) + (cs|selectattr('confidence','equalto','medium')|list) + (cs|selectattr('confidence','equalto','low')|list) %}
+{% set phone = (cphones|first).phone_e164 if cphones else b.phone_e164 %}
+<div>
+  <div class="card-title" style="align-items:center">
+    <h2 style="font-size:20px">{{ b.canonical_name }}</h2>
+    {% if s %}<span class="chip cls-{{ s.cls }}">{{ CLASS_LABELS.get(s.cls, s.cls) }}</span>{% endif %}
+  </div>
+  <div class="small muted" style="margin-top:2px;font-size:13px">{{ b.trade or 'Trade unknown' }}{% if (b.address or {}).get('line1') %} · {{ b.address.line1 }}{% endif %}{% if (b.address or {}).get('city') %}, {{ b.address.city }}{% endif %}
+    · {{ phone or 'no phone' }} · {% if b.website_url %}<a class="link" href="{{ b.website_url }}" target="_blank" rel="noopener">{{ b.domain }}</a>{% else %}no website{% endif %}</div>
+</div>
+{% if s %}
+<div class="score-line">
+  <div class="big xl">{{ '%.0f'|format(s.total|float) }}</div>
+  <div class="muted" style="font-size:13px">of 100 · confidence {{ s.confidence }} · coverage {{ s.coverage|coverage(v.part_max) }}</div>
+</div>
+<div class="bars">
+  {% for p in ['need','ability','timing','reach'] %}{% set val = s[p]|float %}{% set mx = v.part_max.get(p, 1) %}
+  <div class="bar-row"><div class="lab"><span>{{ PART_LABELS[p] }}</span><span>{{ '%.0f'|format(val) }} / {{ mx }}</span></div>
+    <div class="bar"><span style="width:{{ [((val / mx) * 100)|round, 100]|min }}%"></span></div></div>
+  {% endfor %}
+</div>
+<div class="note-box">
+  <div class="t">Why it ranks here</div>
+  {% set items = (s.reasons['items'] or [])[:4] %}
+  {% for r in items %}{{ r.signal|humanize }} ({{ r.direction }}, {{ '%+.1f'|format(r.points|float) }} {{ r.part }}){{ '; ' if not loop.last else '.' }}{% endfor %}
+  {% if s.reasons.codes %}<div class="small muted" style="margin-top:6px">Rule codes: {{ s.reasons.codes|join(', ') }}</div>{% endif %}
+  {% if not items and not s.reasons.codes %}<span class="muted">No reasons recorded.</span>{% endif %}
+</div>
+{% else %}
+<div class="note-box muted">Not scored yet.</div>
+{% endif %}
+<div class="btn-row">
+  <a class="btn btn-primary btn-lg" href="/business/{{ b.id }}">Open Business 360</a>
+  {% if v.audit %}<a class="btn btn-lg" href="/report/{{ v.audit.id }}" target="_blank">Preview report</a>
+  {% else %}<span class="btn btn-lg muted" title="Audits are built for Class A and B">No report yet</span>{% endif %}
+</div>
+{% if user and user.can('operator') %}
+<form method="post" action="/business/{{ b.id }}/remove" style="text-align:right"
+      onsubmit="return confirm('Delete {{ b.canonical_name|replace("'", "") }} from your list? You can restore it later in Settings.')">
+  <button class="btn-sm danger">Delete business</button>
+</form>
+{% endif %}

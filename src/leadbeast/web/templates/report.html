@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visibility report · {{ a.business.name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+@page{size:A4;margin:16mm 15mm}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:794px;padding:48px 48px 40px;background:#fff;color:#15201E;
+  font:14px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",sans-serif}
+@media print{body{padding:0;max-width:none}}
+h1,h2{font-family:'Space Grotesk',system-ui,sans-serif;letter-spacing:-0.02em;margin:0}
+h1{font-size:30px;line-height:1.12;margin-top:6px}
+h2{font-size:19px;margin:0 0 10px}
+section{margin-top:22px;page-break-inside:avoid}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0B6E5F}
+.by{font-size:12px;color:#5B6663;text-align:right;flex:none;line-height:1.5}
+.meta{font-size:13px;color:#5B6663;margin-top:6px}
+.short{margin-top:20px;padding:16px 18px;border-radius:12px;background:#F3F8F6;border:1px solid #BFDDD6}
+.short .k{font-size:13px;font-weight:600;color:#0B4F44;margin-bottom:4px}
+.short .v{font-size:15px;line-height:1.55}
+.finding{border:1px solid #E3E1DA;border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.finding .s{font-size:15px;font-weight:600}
+.cite{color:#5B6663;font-size:11px;margin-top:4px}
+table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #E3E1DA;border-radius:10px;overflow:hidden;font-size:14px}
+th{background:#F6F5F1;color:#5B6663;font-size:12px;font-weight:600;text-align:left;padding:9px 14px}
+td{border-top:1px solid #EFEDE6;padding:9px 14px}
+.fixes{display:flex;gap:14px;flex-wrap:wrap}
+.fix{flex:1 1 200px;display:flex;flex-direction:column;gap:3px}
+.fix .n{font-family:'Space Grotesk',system-ui,sans-serif;font-size:24px;font-weight:700;color:#0B6E5F;line-height:1.1}
+.fix .t{font-size:14px;line-height:1.45;color:#3F4A47}
+.est{padding:14px 18px;border-radius:12px;border:1px solid #E3E1DA}
+.est .k{font-size:13px;font-weight:600;color:#5B6663;margin-bottom:4px}
+footer{margin-top:28px;padding-top:14px;border-top:1px solid #E3E1DA;display:flex;justify-content:space-between;gap:16px;align-items:flex-end}
+footer .next{font-size:14px;line-height:1.5}
+footer .src{font-size:11px;color:#5B6663;flex:none;text-align:right}
+</style></head>
+<body>
+<div class="head">
+  <div>
+    <div class="eyebrow">Visibility report</div>
+    <h1>How {{ a.business.name }} shows up when people nearby search</h1>
+    <div class="meta">{{ a.business.trade or '' }}{% if a.business.city %} · {{ a.business.city }}{% endif %}{% if a.business.website %} · {{ a.business.website }}{% endif %}</div>
+  </div>
+  <div class="by">Prepared by<br>{{ operator.name or '[operator name]' }}<br>{{ generated }}</div>
+</div>
+
+<div class="short">
+  <div class="k">The short version</div>
+  <div class="v">{% if a.gap_types %}Where customers lose you: <strong>{{ a.gap_types|join(', ') }}</strong>. {% endif %}{% if a.findings %}We found {{ a.findings|length }} thing{{ '' if a.findings|length == 1 else 's' }} worth fixing, each with a simple next step below.{% else %}We did not find enough verified evidence to report on yet.{% endif %}</div>
+</div>
+
+<section>
+  <h2>What we found</h2>
+  {% for f in a.findings %}
+  <div class="finding"><div class="s">{{ loop.index }}. {{ f.statement }}</div>
+    <div class="cite">Evidence {{ f.evidence_id[:8] if f.evidence_id }}{% if f.observed_at %} · checked {{ f.observed_at[:10] }}{% endif %}{% if f.source_url and f.source_url.startswith('http') %} · {{ f.source_url }}{% endif %}</div></div>
+  {% else %}<p>We did not find enough verified evidence to report on yet.</p>{% endfor %}
+</section>
+
+{% if a.peers and a.peers.summary %}
+<section>
+  <h2>You against nearby companies</h2>
+  <p class="meta" style="margin:-4px 0 10px">{{ a.peers.ids|length }} similar businesses within {{ a.peers.radius_km }} km.</p>
+  <table><tr><th>Signal</th><th>Nearby peers</th></tr>
+  {% for sig, v in a.peers.summary.items() %}<tr><td>{{ sig.replace('_',' ')|capitalize }}</td>
+  <td>{% if v.share_yes is defined %}{{ (v.share_yes*100)|round|int }}% yes{% else %}median {{ v.median }}{% endif %} (n={{ v.n }})</td></tr>{% endfor %}
+  </table>
+</section>
+{% endif %}
+
+{% if a.findings %}
+<section>
+  <h2>A simple fix plan</h2>
+  <div class="fixes">
+    {% for f in a.findings if f.fix %}<div class="fix"><div class="n">{{ loop.index }}</div><div class="t">{{ f.fix }}</div></div>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="est">
+  <div class="k">What it could be worth (estimate)</div>
+  <div><strong>Estimate.</strong> If one extra customer a month is worth ${{ a.payback.value_low|int }} to ${{ a.payback.value_high|int }},
+  the service at ${{ a.payback.monthly_fee|int }} a month returns about {{ a.payback.multiple_low }}x to {{ a.payback.multiple_high }}x its cost.
+  This is an estimate, not a promise.{% if a.payback.provisional %} These figures are provisional.{% endif %}</div>
+</section>
+
+<footer>
+  <div class="next"><strong>Next step:</strong> reply or call {{ operator.phone or '[phone]' }}{% if operator.email %} ({{ operator.email }}){% endif %} and we can start this week.
+    {% if operator.address %}<div class="meta" style="margin-top:2px">{{ operator.address }}</div>{% endif %}</div>
+  <div class="src">Sources and dates available on request</div>
+</footer>
+</body></html>

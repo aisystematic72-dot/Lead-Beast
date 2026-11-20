@@ -1,0 +1,99 @@
+# Visibility Gap pack: businesses of 1 to 25 people whose customers cannot find them online.
+# Weights and mappings are STARTING VALUES (open decision 2). Tune against the golden set.
+name: visibility_gap
+version: "1.0.0"
+description: Local businesses (1-25 staff) with a provable online visibility gap.
+size_min: 1
+size_max: 25
+trades: [hvac, plumbing, roofing, electrician, dental, cafe, landscaping, cleaning]
+peer_radius_km: 25
+
+detectors:
+  - website_presence
+  - website_quality
+  - site_health
+  - marketing_stack
+  - marketing_activity
+  - listing_claimed
+  - vitality
+  - operating_style
+
+freshness_days:
+  licence_active: 180
+  staff_count: 365
+  years_in_business: 365
+
+parts:
+  need:
+    max_points: 40
+    signals:
+      - { signal: has_website, weight: 3, when_yes: 0.0, when_no: 1.0, when_not_detected: 0.9, key: true, high_impact: true }
+      - { signal: domain_alive, weight: 2, when_yes: 0.0, when_no: 1.0, high_impact: true }
+      - { signal: parked, weight: 1, when_yes: 1.0, when_no: 0.0 }
+      - { signal: website_quality, weight: 2, numeric: { lo: 0.0, hi: 1.0, invert: true } }
+      - { signal: listing_claimed, weight: 2, when_yes: 0.2, when_no: 1.0, when_not_detected: 0.8 }
+      - { signal: review_count, weight: 1.5, numeric: { lo: 0, hi: 50, invert: true } }
+      - { signal: in_map_pack, weight: 1.5, when_yes: 0.0, when_no: 1.0 }
+      - { signal: social_active, weight: 1, when_yes: 0.0, when_no: 1.0, when_not_detected: 0.8 }
+      - { signal: fresh_content, weight: 1, when_yes: 0.0, when_no: 1.0, when_not_detected: 0.8 }
+      - { signal: ads_seen, weight: 0.5, when_yes: 0.0, when_no: 0.7, when_not_detected: 0.7 }
+  ability:
+    max_points: 30
+    signals:
+      - { signal: licence_active, weight: 2, when_yes: 1.0, when_no: 0.0, key: true }
+      - { signal: staff_count, weight: 2, numeric: { lo: 1, hi: 15 } }
+      - { signal: years_in_business, weight: 1.5, numeric: { lo: 0, hi: 15 } }
+      - { signal: photo_count, weight: 0.5, numeric: { lo: 0, hi: 20 } }
+      - { signal: hours_present, weight: 0.5, when_yes: 0.8, when_no: 0.3 }
+      - { signal: own_domain_email, weight: 1, when_yes: 1.0, when_no: 0.5 }
+  timing:
+    max_points: 10
+    signals:
+      - { signal: last_review_age, weight: 1, numeric: { lo: 0, hi: 365, invert: true } }
+      - { signal: recent_activity, weight: 1, when_yes: 1.0, when_no: 0.2 }
+      - { signal: new_location, weight: 1, when_yes: 1.0, when_no: 0.3 }
+  reach:
+    max_points: 20
+    signals:
+      - { signal: contact_email_valid, weight: 3, when_yes: 1.0, when_no: 0.0 }
+      - { signal: contact_phone_valid, weight: 2, when_yes: 1.0, when_no: 0.0 }
+      - { signal: contact_path, weight: 1, when_yes: 1.0, when_no: 0.4, when_not_detected: 0.4 }
+
+thresholds:
+  class_a:
+    score: 70
+    coverage_need: 0.6
+    coverage_ability: 0.6
+    coverage_reach: 0.5
+    min_confidence: medium
+    service_fit: 60
+    winnability: 40
+  class_b_score: 55
+  class_c_score: 40
+  review_min_coverage: 0.3
+
+gates:
+  vitality:
+    closure_signals: [closure_signals]
+    activity_signals: [recent_activity, open_status]
+  service_fit_threshold: 60
+  winnability:
+    threshold: 40
+    signals:
+      - { signal: pixels, weight: 1, when_yes: 0.4, when_no: 0.9, when_not_detected: 0.9 }
+      - { signal: crm_forms, weight: 1, when_yes: 0.4, when_no: 0.9, when_not_detected: 0.9 }
+      - { signal: booking_widget, weight: 1, when_yes: 0.5, when_no: 0.8, when_not_detected: 0.8 }
+
+confidence:
+  high_min_coverage: 0.75
+  medium_min_coverage: 0.5
+
+gap_thresholds:
+  website_quality_weak: 0.5
+  review_count_low: 10
+
+policy:
+  daily_send_cap: 20
+  quiet_start: "20:00"
+  quiet_end: "08:00"
+  allowed_channels: [email]

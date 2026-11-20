@@ -1,0 +1,25 @@
+# Problem Library (spec section 19). use_in_message stays false until each problem's
+# symptoms pass the 90% golden-set check.
+problems:
+  - id: no_online_booking
+    name: No online booking
+    areas: [scheduling]
+    kind: structural
+    use_in_message: false
+    symptoms:
+      - { signal: booking_widget, weight: 3, polarity: contradicts }
+      - { signal: booking_or_call_capture, weight: 2, polarity: contradicts }
+  - id: site_broken
+    name: Website broken or expired
+    areas: [website]
+    kind: acute
+    half_life_days: 21
+    use_in_message: false
+    symptoms:
+      - { signal: site_down, weight: 3, polarity: supports }
+      - { signal: cert_expired, weight: 2, polarity: supports }
+      - { signal: coming_soon_page, weight: 1, polarity: supports }
+pressure:
+  use_in_message: false
+  financial_strain: "off"
+  triggers: []

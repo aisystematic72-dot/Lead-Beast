@@ -1,0 +1,95 @@
+{% extends "base.html" %}{% block title %}Market and learning · LeadBeast{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Market and learning</h1>
+    <div class="sub">What the market looks like and what actually turns into paying customers.</div>
+  </div>
+</header>
+
+{% set fn = m.funnel %}
+<section class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+  <div class="kpi" style="padding:16px"><div class="l">Businesses in view</div><div class="v" style="font-size:28px">{{ fn.collected }}</div><div class="d">Across all campaigns</div></div>
+  <div class="kpi" style="padding:16px"><div class="l">Class A or B</div><div class="v" style="font-size:28px">{{ fn.qualified }}</div><div class="d">Of {{ fn.scored }} scored</div></div>
+  <div class="kpi" style="padding:16px"><div class="l">Contacted</div><div class="v" style="font-size:28px">{{ fn.sent }}</div><div class="d">{{ fn.replied }} replied</div></div>
+  <div class="kpi" style="padding:16px"><div class="l">Wins so far</div><div class="v" style="font-size:28px">{{ m.learning.wins }} of 20</div><div class="d">Model learns after 20 wins</div></div>
+</section>
+
+<div class="cols">
+  <section class="card col-half">
+    <h2>From found to won</h2>
+    {% set top = fn.collected or 1 %}
+    <div class="bars" style="gap:12px">
+      {% for k, l in [('collected','Found'),('scored','Scored'),('qualified','Class A or B'),('drafted','Drafted'),('sent','Approved and contacted'),('replied','Replied'),('won','Won')] %}
+      <div class="bar-row"><div class="lab" style="font-size:13px"><span>{{ l }}</span><span>{{ fn[k] }}</span></div>
+        <div class="bar lg"><span style="width:{{ [(fn[k] / top * 100)|round, 100]|min }}%"></span></div></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card col-half">
+    <h2>Where the gap is, by class</h2>
+    {% set gmax = (m.gap_mix.values()|max if m.gap_mix else 0) or 1 %}
+    <div class="bars" style="gap:12px">
+      {% for k, l in GAP_LABELS.items() %}{% set n = m.gap_mix.get(k, 0) %}
+      <div class="hbar"><span>{{ k }} {{ l }}</span><div class="bar"><span class="{{ {'B':'b','C':'c','D':'d'}.get(k, '') }}" style="width:{{ (n / gmax * 100)|round }}%"></span></div><span>{{ n }}</span></div>
+      {% endfor %}
+    </div>
+    <div class="small muted" style="line-height:1.5">Gap class says what kind of gap a business has. It is separate from priority class (A Priority, B Develop, C Monitor, D Suppress), which says what to do next.</div>
+  </section>
+</div>
+
+<div class="cols">
+  <section class="card col-half">
+    <h2>Priority class mix</h2>
+    {% set tot = (m.class_mix.values()|sum) or 1 %}
+    <div class="bars" style="gap:12px">
+      {% for k in ['A','B','review','C','D'] %}{% set n = m.class_mix.get(k, 0) %}
+      <div class="hbar"><span>{{ CLASS_LABELS[k] }}</span><div class="bar"><span class="{{ {'B':'b','C':'c','D':'d','review':'rv'}.get(k, '') }}" style="width:{{ (n / tot * 100)|round }}%"></span></div><span>{{ n }}</span></div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card col-half">
+    <h2>Operating style</h2>
+    <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+      {% for k, n in m.operating_style.items() %}<div class="tile"><div class="k">{{ k|replace('_', '-')|humanize }}</div><div class="v" style="font-family:var(--head);font-size:24px">{{ n }}</div></div>
+      {% else %}<div class="prose">No operating style evidence yet.</div>{% endfor %}
+    </div>
+    <div class="small muted" style="line-height:1.5">Worked out from non-marketing signals only.</div>
+  </section>
+</div>
+
+<div class="cols">
+  <section class="card flush col-half">
+    <div class="card-head"><h2>Which signals earn their place</h2></div>
+    <div style="padding:14px 20px 0" class="prose">A signal reaches outreach only when it is at least {{ (m.threshold * 100)|int }}% right on the labelled golden set.</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Signal</th><th>Precision</th><th>Recall</th><th>Labelled</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for p in m.precision %}
+        <tr><td>{{ p.signal|humanize }}<div class="m">{{ p.detector_version }}</div></td>
+          <td class="num">{{ p.precision|pct if p.precision is not none else 'n/a' }}</td>
+          <td class="num">{{ p.recall|pct if p.recall is not none else 'n/a' }}</td>
+          <td class="num">{{ p.n_labelled }}</td>
+          <td>{% if p.live %}<span class="strong" style="color:var(--accent)">Live</span>{% else %}<span class="strong" style="color:var(--amber)">Held back</span>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="5" class="empty">No golden labels yet. Import with <code>leadbeast golden import labels.csv</code>.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card col-half" style="gap:12px">
+    <h2>What the system learned</h2>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      {% if m.learning.challenger_ready %}
+      <div class="note-box"><strong>Enough outcomes logged.</strong> {{ m.learning.outcomes }} outcomes and {{ m.learning.wins }} wins. A challenger model can be trained and tested in shadow.</div>
+      {% else %}
+      <div class="note-box"><strong>Not enough outcomes yet.</strong> {{ m.learning.outcomes }} outcomes and {{ m.learning.wins }} wins logged. Weights stay at the pack defaults until about 100 outcomes and at least 20 wins.</div>
+      {% endif %}
+      <div class="note-box"><strong>Next review:</strong> after the first 20 contacted businesses, tag each as won, lost or no reply, and why.</div>
+      <div class="note-box"><strong>Then:</strong> a challenger model is tested against the current one. It only replaces it if it does better on the same data.</div>
+    </div>
+  </section>
+</div>
+{% endblock %}

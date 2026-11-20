@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% block title %}Reachable · LeadBeast{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Reachable</h1>
+    <div class="sub">Businesses worth contacting now: not actively marketing on Facebook, and they pass the open and able-to-afford checks.</div>
+  </div>
+  <div class="actions">
+    <form method="get" action="/reachable">
+      <select name="campaign" aria-label="Campaign" onchange="this.form.submit()">
+        <option value="">Campaign: all</option>
+        {% for c in campaigns %}<option value="{{ c.id }}" {{ 'selected' if campaign and campaign|string == c.id|string }}>Campaign: {{ c.name }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+</header>
+
+<section class="kpis" aria-label="Summary" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+  <div class="kpi"><div class="l">Reachable now</div><div class="v accent">{{ r.rows|length }}</div></div>
+  <div class="kpi"><div class="l">New since last check</div><div class="v">{{ r.new }}</div></div>
+  <div class="kpi"><div class="l">With email or phone</div><div class="v">{{ r.with_contact }}</div></div>
+  <div class="kpi"><div class="l">Actively posting (not listed)</div><div class="v">{{ r.active }}</div></div>
+</section>
+
+<div class="cols">
+  <section class="card flush col-main">
+    <div class="card-head"><h2>Businesses</h2><span class="note">Strongest reason first</span></div>
+    <div>
+    {% for b in r.rows %}
+      <div class="alert-item">
+        <div class="top">
+          <div>
+            <div class="who">{{ b.name }} <span>{{ b.trade or '' }}{{ ' · ' ~ b.city if b.city }}</span>
+              {% if b.new %}<span class="chip chip-sm st-observed_yes" style="margin-left:6px">New</span>{% endif %}</div>
+            <div class="what"><strong>{{ b.reason }}.</strong> {{ b.summary }}</div>
+          </div>
+          <span class="chip chip-sm cls-{{ b['class'] }}">{{ 'Review' if b['class'] == 'review' else 'Class ' ~ b['class'] }}</span>
+        </div>
+        <div class="facts">
+          <span>Last post {{ b.last_post_date or 'none' }}{% if b.last_post_date and b.days_since_last_post is not none %} ({{ b.days_since_last_post|int }} days before the check){% endif %}</span>
+          {% if b.avg_gap_days is not none and (b.posts_found or 0) >= 5 %}<span>Avg gap {{ b.avg_gap_days }} days</span>{% endif %}
+          {% if b.posts_found is not none %}<span>{{ b.posts_found }} post{{ '' if b.posts_found == 1 else 's' }} checked</span>{% endif %}
+          <span>Contact: {% if b.has_email and b.has_phone %}email, phone{% elif b.has_email %}email{% elif b.has_phone %}phone{% else %}none on file{% endif %}</span>
+          <span>Score {{ '%.0f'|format(b.score) }}</span>
+          <span>Checked {{ b.checked_on or 'n/a' }}</span>
+        </div>
+        {% if b.note %}<div class="facts"><span>Note: {{ b.note }}</span></div>{% endif %}
+        <div class="actions" style="margin-top:2px">
+          <a class="btn btn-sm btn-primary" href="/calls/{{ b.business_id }}">Open call brief</a>
+          <a class="btn btn-sm" href="/business/{{ b.business_id }}">Open Business 360</a>
+          {% if b.page %}<a class="btn btn-sm" href="{{ b.page }}" target="_blank" rel="noopener">Facebook page</a>{% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="alert-item"><div class="prose">No reachable businesses yet. Run the Facebook activity check (<code>lb social fb-analyze</code>, then <code>lb social fb-import &lt;campaign&gt;</code>) and quiet businesses that pass the checks appear here.</div></div>
+    {% endfor %}
+    </div>
+  </section>
+
+  <aside class="col-side" style="flex-basis:360px;gap:16px">
+    <section class="card" style="gap:8px">
+      <h2>Why they are listed</h2>
+      <div class="soc-row"><span>Facebook page unavailable</span><span>{{ r.by_reason.unavailable }}</span></div>
+      <div class="soc-row"><span>Not actively marketing</span><span>{{ r.by_reason.inactive }}</span></div>
+      <div class="soc-row"><span>Posting irregularly</span><span>{{ r.by_reason.irregular }}</span></div>
+      <div class="small muted" style="line-height:1.5">{{ r.checked }} businesses had their Facebook checked. {{ r.held_back_total }} quiet ones are not listed: {{ r.held_back.cannot_afford }} look unable to afford a service, {{ r.held_back.looks_closed }} may be closed.</div>
+    </section>
+    <section class="card" style="gap:8px">
+      <h2>How to use it</h2>
+      <div style="font-size:13px;color:var(--ink2);line-height:1.55">This list tells you who to look at first. It is not permission to contact: check the lead in Business 360, then draft, and every message still goes through Approvals. The Facebook reason is never mentioned in a message. The list updates each time you re-run the Facebook check; "New" marks businesses that were actively posting at the previous check.</div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

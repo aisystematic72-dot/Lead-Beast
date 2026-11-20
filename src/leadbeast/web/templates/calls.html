@@ -1,0 +1,76 @@
+{% extends "base.html" %}{% block title %}Call list · LeadBeast{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Call list</h1>
+    <div class="sub">Click a business to open its call brief: who they are, what we noticed, how we can help, and what to say.</div>
+  </div>
+</header>
+
+{% set high = rows|selectattr('level', 'equalto', 'High')|list|length %}
+{% set med = rows|selectattr('level', 'equalto', 'Medium')|list|length %}
+<section class="kpis" aria-label="Summary">
+  <div class="kpi"><div class="l">Businesses to call</div><div class="v">{{ rows|length }}</div></div>
+  <div class="kpi"><div class="l">High opportunity</div><div class="v accent">{{ high }}</div></div>
+  <div class="kpi"><div class="l">Medium opportunity</div><div class="v">{{ med }}</div></div>
+  <div class="kpi"><div class="l">Low opportunity</div><div class="v">{{ rows|length - high - med }}</div></div>
+</section>
+
+<section class="card flush">
+  <div class="tabbar" role="group" aria-label="Filter">
+    {% for lv in ['All', 'High', 'Medium', 'Low'] %}
+    <label class="pill-tab soft"><input type="radio" name="lv" value="{{ lv }}" {{ 'checked' if loop.first }}><span>{{ lv }}</span></label>
+    {% endfor %}
+    <span class="spacer"></span>
+    <select id="trade" aria-label="Trade">
+      <option value="">All trades</option>
+      {% for t in trades %}<option value="{{ t }}">{{ t|humanize }}</option>{% endfor %}
+    </select>
+    <input type="search" id="q" placeholder="Search name or city" aria-label="Search">
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Business</th><th>Phone</th><th>Facebook</th><th>Main reason to call</th><th>Opportunity</th></tr></thead>
+      <tbody id="call-rows">
+      {% for b in rows %}
+        <tr class="click call-row" data-href="/calls/{{ b.id }}" data-level="{{ b.level }}" data-trade="{{ b.trade }}"
+            data-text="{{ (b.name ~ ' ' ~ b.city)|lower }}" tabindex="0">
+          <td style="min-width:220px"><div class="t"><a href="/calls/{{ b.id }}">{{ b.name }}</a></div>
+            <div class="m">{{ b.trade|humanize or 'Trade unknown' }}{{ ' · ' ~ b.city if b.city }}</div></td>
+          <td class="num" style="white-space:nowrap">{{ b.phone or '—' }}</td>
+          <td><span class="chip chip-sm fb-{{ b.fb_status }}">{{ FB_TEXT.get(b.fb_status, 'Not checked') }}</span></td>
+          <td>{% if b.findings %}{{ b.findings[0].title }}{% if b.findings|length > 1 %} <span class="muted">+{{ b.findings|length - 1 }} more</span>{% endif %}{% else %}<span class="muted">No clear gap, pitch growth</span>{% endif %}</td>
+          <td><span class="chip lvl-{{ b.level|lower }}">{{ b.level }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="empty">No businesses yet.</td></tr>
+      {% endfor %}
+      <tr id="no-match" hidden><td colspan="5" class="empty">No business matches these filters.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+(function () {
+  var rows = document.querySelectorAll('.call-row'), q = document.getElementById('q'),
+      trade = document.getElementById('trade'), none = document.getElementById('no-match');
+  function apply() {
+    var lv = document.querySelector('input[name=lv]:checked').value, t = trade.value,
+        s = q.value.trim().toLowerCase(), shown = 0;
+    rows.forEach(function (r) {
+      var ok = (lv === 'All' || r.dataset.level === lv) && (!t || r.dataset.trade === t) &&
+               (!s || r.dataset.text.indexOf(s) !== -1);
+      r.hidden = !ok; if (ok) shown++;
+    });
+    none.hidden = shown > 0;
+  }
+  document.querySelectorAll('input[name=lv]').forEach(function (x) { x.addEventListener('change', apply); });
+  trade.addEventListener('change', apply); q.addEventListener('input', apply);
+  rows.forEach(function (r) {
+    r.addEventListener('click', function (e) { if (!e.target.closest('a')) location.href = r.dataset.href; });
+    r.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = r.dataset.href; });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}{% block title %}Campaign Studio · LeadBeast{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Campaign Studio</h1>
+    <div class="sub">Start with what you sell. LeadBeast works out who should buy it.</div>
+  </div>
+</header>
+
+<ol class="stepper">
+  <li class="on"><span class="n">1</span><span>Your offer</span></li>
+  <li><span class="n">2</span><span>Ideal customer</span></li>
+  <li><span class="n">3</span><span>Where to look</span></li>
+  <li><span class="n">4</span><span>Budget and rules</span></li>
+</ol>
+
+{% if error %}<div class="flash bad">{{ error }}</div>{% endif %}
+
+<div class="cols">
+<form method="post" action="/campaigns/new" class="card col-main" style="padding:24px;gap:22px">
+
+  <div class="step">
+    <div class="step-head"><h2>Step 1. What are you selling?</h2>
+      <div class="sub">Pick a saved offer or describe your own. The ideal customer follows from this.</div></div>
+    <div class="tiles">
+      {% for o in offers %}
+      <label class="offer-pick"><input type="radio" name="offer_id" value="{{ o.id }}" {{ 'checked' if loop.first }}>
+        <span class="box"><span class="t">{{ o.name }}</span>
+          <span class="d">${{ '%.0f'|format(o.monthly_fee|float) }} a month · one customer worth ${{ '%.0f'|format(o.customer_value_low|float) }} to ${{ '%.0f'|format(o.customer_value_high|float) }}{{ ' · provisional' if o.provisional }}</span>
+          <span class="s">Selected</span></span></label>
+      {% endfor %}
+      <label class="offer-pick"><input type="radio" name="offer_id" value="" {{ 'checked' if not offers }}>
+        <span class="box"><span class="t">Your own offer</span>
+          <span class="d">Describe it and its price below. LeadBeast checks the payback rule.</span>
+          <span class="s">Selected</span></span></label>
+    </div>
+    <div class="fields two">
+      <div class="field"><label for="offer_name">Offer name</label><input id="offer_name" name="offer_name" placeholder="Visibility audit and fix"></div>
+      <div class="field"><label for="monthly_fee">Monthly fee ($)</label><input id="monthly_fee" name="monthly_fee" type="number" step="1" min="0" placeholder="300"></div>
+      <div class="field"><label for="value_low">Value of one new customer, low ($)</label><input id="value_low" name="value_low" type="number" step="1" min="0" placeholder="600"></div>
+      <div class="field"><label for="value_high">Value of one new customer, high ($)</label><input id="value_high" name="value_high" type="number" step="1" min="0" placeholder="1500"></div>
+    </div>
+    <div class="note-box">Payback rule: one extra customer a month must be worth at least 2x the fee. New offer fields are used only when "Your own offer" is selected.</div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><h2>Step 2. Ideal customer</h2>
+      <div class="sub">Suggested by the pack for this offer. Matches use evidence, not labels.</div></div>
+    <div class="fields">
+      <div class="field"><label for="pack">Pack</label>
+        <select id="pack" name="pack"><option value="visibility_gap">Visibility Gap (1 to 25 people)</option></select></div>
+    </div>
+    <div class="tiles two">
+      <div class="tile"><div class="k">Size</div><div class="v">1 to 25 people</div></div>
+      <div class="tile"><div class="k">Visibility gap classes</div><div class="v">A Invisible · B Weak site · C Unranked</div></div>
+      <div class="tile"><div class="k">Operating style</div><div class="v">Non-tech first, tech allowed</div></div>
+      <div class="tile"><div class="k">Must be busy</div><div class="v">Vitality gate on</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><h2>Step 3. Where to look</h2>
+      <div class="sub">A borough, town or region.</div></div>
+    <div class="fields">
+      <div class="field"><label for="area">Area</label><input id="area" name="area" placeholder="Brooklyn" required></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><h2>Step 4. Budget and rules</h2>
+      <div class="sub">A cap of 0 means free sources only.</div></div>
+    <div class="fields">
+      <div class="field"><label for="name">Campaign name</label><input id="name" name="name" placeholder="Local services, Brooklyn" required></div>
+      <div class="field"><label for="budget_cap">Budget cap ($ a month)</label><input id="budget_cap" name="budget_cap" type="number" step="1" min="0" value="0"></div>
+    </div>
+  </div>
+
+  <div class="form-foot">
+    <span class="prose">After saving, run a Launch Lab dry run before a full collection.</span>
+    <button class="primary btn-lg">Save campaign</button>
+  </div>
+</form>
+
+<aside class="col-side">
+  <section class="card" style="gap:12px">
+    <h2>What this campaign will do</h2>
+    <ol class="plain">
+      <li>Collect businesses from your chosen sources</li>
+      <li>Drop the ones that look closed or inactive</li>
+      <li>Audit visibility and score each business</li>
+      <li>Find a contact and draft an opener</li>
+      <li>Wait for your approval before anything is sent</li>
+    </ol>
+  </section>
+  <section class="card" style="gap:10px">
+    <h2>Running cost</h2>
+    <div class="kv">
+      <div><span>Free sources first</span><span class="val">$0</span></div>
+      <div><span>Paid connectors</span><span class="val">Off at a $0 cap</span></div>
+    </div>
+    <div class="small muted" style="line-height:1.5">The cost guard stops any paid source before it spends past your cap.</div>
+  </section>
+  <section class="card" style="gap:8px">
+    <h2>Safety defaults</h2>
+    <div style="font-size:13px;line-height:1.7">Nothing is sent without your approval.<br>Personal use only.<br>Do-not-contact list always applies.</div>
+  </section>
+</aside>
+</div>
+{% endblock %}

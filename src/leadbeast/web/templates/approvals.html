@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% block title %}Approvals · LeadBeast{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Approvals</h1>
+    <div class="sub">Nothing is sent without your approval. Class A also needs a recorded mystery check, and the policy engine checks again at send time.</div>
+  </div>
+  <a class="btn" href="/opportunities">Back to Opportunities</a>
+</header>
+
+<section class="kpis" aria-label="Summary">
+  <div class="kpi"><div class="l">Waiting for your approval</div><div class="v accent">{{ items|selectattr('draft.status', 'equalto', 'draft')|list|length }}</div></div>
+  <div class="kpi"><div class="l">Blocked by policy</div><div class="v">{{ items|selectattr('draft.status', 'equalto', 'blocked')|list|length }}</div></div>
+</section>
+
+{% for it in items %}{% set d = it.draft %}
+<section class="card draft-card" style="gap:12px">
+  <div class="card-title">
+    <div><a class="link" style="font-family:var(--head);font-size:18px" href="/business/{{ d.business_id }}">{{ it.business_name }}</a>
+      <div class="small muted" style="margin-top:2px">{{ d.channel|humanize }} · cites {{ d.cited_evidence_ids|length }} evidence rows · created {{ d.created_at.strftime('%Y-%m-%d') }}</div></div>
+    <span class="chip {{ 'bad-chip' if d.status == 'blocked' else 'info-chip' }}">{{ d.status|humanize }}</span>
+  </div>
+  {% if d.blocked_reasons %}<div class="flash bad">Blocked by policy: {{ d.blocked_reasons|join(', ') }}</div>{% endif %}
+  {% if d.subject %}<div style="font-size:13px"><strong>Subject:</strong> {{ d.subject }}</div>{% endif %}
+  <div id="dec-{{ d.id }}">
+  {% if d.status == 'draft' and user.can('approver') %}
+  <form hx-post="/drafts/{{ d.id }}/decision" hx-target="#dec-{{ d.id }}" style="display:flex;flex-direction:column;gap:10px">
+    <textarea name="edited_body" aria-label="Message body">{{ d.body }}</textarea>
+    <div class="actions">
+      <button class="primary" name="decision" value="approve">Approve as is</button>
+      <button name="decision" value="edit">Approve with edits</button>
+      <button name="decision" value="reject">Skip</button>
+    </div>
+  </form>
+  {% else %}<div class="draft-box">{{ d.body }}</div>{% endif %}
+  </div>
+</section>
+{% else %}
+<section class="card"><div class="prose">The queue is empty. New drafts appear here after a business is audited.</div></section>
+{% endfor %}
+{% endblock %}

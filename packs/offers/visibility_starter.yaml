@@ -1,0 +1,8 @@
+# Example offer. Values are PLACEHOLDERS until buyer interviews confirm them (open decision 3).
+name: Local Visibility Starter
+monthly_fee: 300
+customer_value_low: 600
+customer_value_high: 1500
+service_fit_profile: { A: 90, B: 80, C: 65, D: 55 }
+competes_with: [marketing_agency, web_design]
+provisional: true

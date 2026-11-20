@@ -1,0 +1,20 @@
+{$LB_DOMAIN} {
+	encode gzip
+	handle_path /crm/* {
+		reverse_proxy espocrm:80
+	}
+	handle_path /metabase/* {
+		reverse_proxy metabase:3000
+	}
+	handle_path /ntfy/* {
+		reverse_proxy ntfy:80
+	}
+	handle {
+		reverse_proxy app:8000
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+	}
+}

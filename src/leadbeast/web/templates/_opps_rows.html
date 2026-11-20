@@ -1,0 +1,18 @@
+{% for r in rows %}
+<tr class="click {{ 'sel' if loop.first }}" hx-get="/business/{{ r.id }}" hx-target="#detail"
+    hx-trigger="{{ 'click, load' if loop.first else 'click' }}">
+  {% set so = r.social if r.social is mapping else {} %}
+  <td style="min-width:200px"><div class="t">{{ r.canonical_name }}
+    {% if so.facebook %}<a class="soc fb" href="{{ so.facebook }}" target="_blank" rel="noopener" title="Facebook" onclick="event.stopPropagation()">f</a>{% endif %}
+    {% if so.instagram %}<a class="soc ig" href="{{ so.instagram }}" target="_blank" rel="noopener" title="Instagram" onclick="event.stopPropagation()">ig</a>{% endif %}
+    <a class="call-link" href="/calls/{{ r.id }}" title="Open the caller dashboard" onclick="event.stopPropagation()">Call brief</a></div>
+    <div class="m">{{ r.trade or 'Trade unknown' }}{% if r.line1 %} · {{ r.line1 }}{% endif %}{% if r.city %}, {{ r.city }}{% endif %}</div></td>
+  <td><span class="chip cls-{{ r['class'] }}">{{ 'Review' if r['class'] == 'review' else r['class'] }}</span></td>
+  <td class="score num">{{ '%.0f'|format(r.total|float) }}</td>
+  <td><div>{% for g in r.gap_types or [] %}{{ GAP_LABELS.get(g, g) }}{{ ', ' if not loop.last }}{% else %}<span class="muted">No gap found</span>{% endfor %}</div>
+    <div class="m">Confidence {{ r.confidence }} · coverage {{ r.coverage|coverage }}</div></td>
+  <td>{% if r.pressure is not none %}{{ r.pressure|int }}, {{ r.pressure_dir or 'steady' }}{% else %}<span class="muted">None</span>{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="empty">No scored businesses yet. Create a campaign, then run a dry run or a collection.</td></tr>
+{% endfor %}

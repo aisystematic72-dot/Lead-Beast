@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Settings · LeadBeast{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <div class="sub">Download your businesses, and restore any business you deleted.</div>
+  </div>
+</header>
+
+<section class="card">
+  <div class="card-title"><h2>Download businesses (CSV)</h2><span class="note">{{ visible }} businesses in your list</span></div>
+  <div class="prose">One row per business: name, trade, street, city, ZIP, phone, other phones, email, website, contact level, class, score and licence or verification. Opens in Excel or Google Sheets. Deleted businesses are not included.</div>
+  <form method="get" action="/export/businesses.csv" class="actions">
+    <select name="campaign" aria-label="Campaign">
+      <option value="">All campaigns</option>
+      {% for c in campaigns %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+    <button class="primary">Download CSV</button>
+  </form>
+</section>
+
+<section class="card flush">
+  <div class="card-head"><h2>Deleted businesses</h2><span class="note">{{ removed|length }} hidden · history is kept, so you can restore any of them</span></div>
+  <div class="table-wrap">
+    <table style="min-width:560px">
+      <thead><tr><th>Business</th><th>Trade</th><th>City</th><th>Deleted</th><th></th></tr></thead>
+      <tbody>
+      {% for r in removed %}
+      <tr>
+        <td class="strong">{{ r.name }}</td>
+        <td class="muted">{{ (r.trade or '')|humanize }}</td>
+        <td class="muted">{{ r.city or '' }}</td>
+        <td class="muted">{{ r.removed_at.strftime('%Y-%m-%d') if r.removed_at else '' }}</td>
+        <td class="right">{% if user.can('operator') %}
+          <form method="post" action="/business/{{ r.id }}/restore" class="inline"><button class="btn-sm">Restore</button></form>
+        {% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="empty">No deleted businesses.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

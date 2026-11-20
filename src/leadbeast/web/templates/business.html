@@ -1,0 +1,246 @@
+{% extends "base.html" %}{% block title %}{{ v.business.canonical_name }} · LeadBeast{% endblock %}
+{% block content %}
+{% set b = v.business %}{% set s = v.snapshot %}
+{% set cs = v.contacts|selectattr('eligible')|selectattr('phone_e164')|list %}
+{% set cphones = (cs|selectattr('confidence','equalto','high')|list) + (cs|selectattr('confidence','equalto','medium')|list) + (cs|selectattr('confidence','equalto','low')|list) %}
+{% set phone = (cphones|first).phone_e164 if cphones else b.phone_e164 %}
+{% set ev = {} %}{% for e in v.evidence %}{% set _ = ev.update({e.signal: e}) %}{% endfor %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+  <a class="back" href="/opportunities">Back to Opportunities</a>
+  {% if user.can('operator') %}
+  <form method="post" action="/business/{{ b.id }}/remove" class="inline"
+        onsubmit="return confirm('Delete {{ b.canonical_name|replace("'", "") }} from your list? You can restore it later in Settings.')">
+    <button class="btn-sm danger">Delete business</button>
+  </form>
+  {% endif %}
+</div>
+
+<header class="biz-head">
+  <div style="min-width:240px">
+    <div class="title">
+      <h1>{{ b.canonical_name }}</h1>
+      {% if s %}<span class="chip cls-{{ s.cls }}">{{ CLASS_LABELS.get(s.cls, s.cls) }}</span>
+        {% for g in s.gap_types or [] %}<span class="chip gap-chip">{{ GAP_LABELS.get(g, g) }}</span>{% endfor %}{% endif %}
+    </div>
+    <div class="meta">{{ b.trade or 'Trade unknown' }}{% if (b.address or {}).get('line1') %} · {{ b.address.line1 }}{% endif %}{% if (b.address or {}).get('city') %}, {{ b.address.city }}{% endif %}{% if (b.address or {}).get('postcode') %} {{ b.address.postcode }}{% endif %}
+      · {{ phone or 'no phone' }} · {% if b.website_url %}<a class="link" href="{{ b.website_url }}" target="_blank" rel="noopener">{{ b.domain }}</a>{% else %}no website{% endif %}
+      {% if ev.style and ev.style.value %} · {{ (ev.style.value.style or 'unknown')|replace('_', '-')|humanize }} operator{% endif %}</div>
+  </div>
+  {% if s %}
+  <div class="stats">
+    <div class="stat"><div class="k">Score</div><div class="big l">{{ '%.0f'|format(s.total|float) }}</div></div>
+    <div class="stat"><div class="k">Confidence</div><div class="v">{{ s.confidence|humanize }}</div></div>
+    <div class="stat"><div class="k">Coverage</div><div class="v">{{ s.coverage|coverage(v.part_max) }}</div></div>
+  </div>
+  {% else %}<div class="muted">Not scored yet</div>{% endif %}
+</header>
+
+{% if v.reviews %}
+<div class="card" style="border-color:var(--violet-bg);gap:6px">
+  <div class="card-title"><h2>Needs a person to decide</h2><span class="chip violet-chip">{{ v.reviews|length }} open</span></div>
+  {% for r in v.reviews %}<div style="font-size:13px"><strong>{{ r.kind|humanize }}</strong> <span class="muted">{{ r.detail|fmt }}</span></div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="cols">
+<div class="col-main">
+
+  <section class="card flush">
+    <div class="card-head"><h2>Evidence</h2><span class="note">Every claim shows its source and age · {{ v.history_count }} events in the ledger</span></div>
+    <div class="table-wrap">
+      <table style="min-width:600px">
+        <thead><tr><th>Signal</th><th>State</th><th>Source</th><th>Age</th></tr></thead>
+        <tbody>
+        {% for e in v.evidence %}
+        <tr>
+          <td><div>{{ e.signal|humanize }}</div>
+            {% if e.value is not none and e.value is not mapping %}<div class="m">{{ e.value|fmt }}</div>{% endif %}
+            {% if e.span %}<div class="m">“{{ e.span[:120] }}”</div>{% endif %}</td>
+          <td><span class="chip chip-sm st-{{ e.state }}">{{ STATE_LABELS.get(e.state, e.state|humanize) }}</span></td>
+          <td class="muted">{% if e.source_url and e.source_url.startswith('http') %}<a class="link" href="{{ e.source_url }}" target="_blank" rel="noopener">{{ e.source }}</a>{% else %}{{ e.source }}{% endif %}</td>
+          <td class="muted">{{ e.age_days|age }}</td>
+        </tr>
+        {% else %}<tr><td colspan="4" class="empty">No evidence yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if v.audit and v.audit.peer_set and v.audit.peer_set.summary %}{% set ps = v.audit.peer_set %}
+  <section class="card">
+    <div class="card-title"><h2>Against nearby peers</h2><span class="note">{{ ps.ids|length }} similar businesses within {{ ps.radius_km }} km</span></div>
+    <div class="tiles">
+      {% for sig, pv in ps.summary.items() %}{% set mine = ev.get(sig) %}
+      <div class="tile"><div class="t" style="font-size:13px;font-weight:600">{{ sig|humanize }}</div>
+        <div class="d" style="margin:4px 0 6px">Peers: {% if pv.share_yes is defined %}{{ (pv.share_yes * 100)|round|int }}% yes{% else %}median {{ pv.median }}{% endif %} (n={{ pv.n }})</div>
+        <div style="font-size:12px">This business: {{ STATE_LABELS.get(mine.state, mine.state) if mine else 'unknown' }}</div></div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="card flush">
+    <div class="card-head"><h2>Problems found</h2><span class="note">Matched on evidence, a business can show several</span></div>
+    <div class="table-wrap">
+      <table style="min-width:600px">
+        <thead><tr><th>Problem</th><th>Area</th><th>Strength</th><th>Confidence</th><th>Last seen</th></tr></thead>
+        <tbody>
+        {% for p in v.problems %}{% set info = v.problem_info.get(p.problem_id) %}{% set st = p.strength|float %}
+        <tr>
+          <td class="strong">{{ info.name if info else p.problem_id|humanize }}</td>
+          <td class="muted">{{ (info.areas|join(', '))|humanize if info else '' }}</td>
+          <td>{% if st >= 0.66 %}<span class="chip chip-sm ok-chip">Strong</span>{% elif st >= 0.33 %}<span class="chip chip-sm info-chip">Medium</span>{% else %}<span class="chip chip-sm violet-chip">Needs check</span>{% endif %}</td>
+          <td class="muted">{{ p.confidence|humanize }} · {{ p.evidence_ids|length }} evidence</td>
+          <td class="muted">{{ p.last_seen.strftime('%Y-%m-%d') }}</td>
+        </tr>
+        {% else %}<tr><td colspan="5" class="empty">No problems matched yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-foot">
+      <div class="small muted" style="line-height:1.5">Time-sensitive signals only change queue order. They never appear in a message and do not make a Class A on their own.</div>
+    </div>
+  </section>
+
+  {% set sp = ev.get('social_profiles') %}{% set so = sp.value if sp and sp.value is mapping else {} %}
+  {% set sa = ev.get('social_active') %}
+  <section class="card" style="gap:10px">
+    <div class="card-title"><h2>Social media</h2>
+      <span class="note">{{ (sa.state ~ '|' ~ (sa.span or '')) | social_label if sa else 'Not checked' }}</span></div>
+    <div class="soc-row"><span><span class="soc fb">f</span> Facebook</span>
+      {% if so.facebook %}<a class="link" href="{{ so.facebook }}" target="_blank" rel="noopener">{{ so.facebook }}</a>{% else %}<span class="muted">None found</span>{% endif %}</div>
+    <div class="soc-row"><span><span class="soc ig">ig</span> Instagram</span>
+      {% if so.instagram %}<a class="link" href="{{ so.instagram }}" target="_blank" rel="noopener">{{ so.instagram }}</a>{% else %}<span class="muted">None found</span>{% endif %}</div>
+    {% if so.other %}<div class="soc-row"><span>Other</span><span>{% for u in so.other %}<a class="link" href="{{ u }}" target="_blank" rel="noopener">{{ u }}</a>{{ ', ' if not loop.last }}{% endfor %}</span></div>{% endif %}
+    {% set fa = ev.get('facebook_activity') %}{% set fd = fa.value if fa and fa.value is mapping else none %}
+    {% if fd %}
+    <div style="border-top:1px solid var(--line, #e7e5e0);padding-top:10px;display:grid;gap:8px">
+      <div class="soc-row"><span><strong>Facebook posting</strong></span>
+        <span class="chip chip-sm st-{{ 'observed_yes' if fd.verdict == 'active' else 'observed_no' }}">{{ {'active': 'Actively posting', 'irregular': 'Posting irregularly', 'inactive': 'Not actively marketing', 'unavailable': 'Page unavailable'}.get(fd.verdict, fd.verdict|humanize) }}</span></div>
+      {% if fd.summary %}<div class="prose">{{ fd.summary }}</div>{% endif %}
+      <div class="soc-row"><span class="muted">Last post</span><span>{% if fd.last_post_date %}{{ fd.last_post_date }}{% if fd.days_since_last_post is not none %} ({{ fd.days_since_last_post|int }} days ago){% endif %}{% else %}<span class="muted">None</span>{% endif %}</span></div>
+      <div class="soc-row"><span class="muted">Average gap between posts</span><span>{% if fd.avg_gap_days is not none and (fd.posts_found or 0) >= 5 %}{{ fd.avg_gap_days }} days{% else %}<span class="muted">n/a (too few posts)</span>{% endif %}</span></div>
+      {% if fd.posts_found is not none %}<div class="soc-row"><span class="muted">Posts checked</span><span>{{ fd.posts_found }}{% if fd.posts_found < 5 %} (fewer than 5){% endif %}</span></div>{% endif %}
+      {% if fd.post_dates %}<div class="soc-row"><span class="muted">Recent post dates</span><span>{{ fd.post_dates|join(', ') }}</span></div>{% endif %}
+      {% if fd.gaps_days %}<div class="soc-row"><span class="muted">Days between posts</span><span>{{ fd.gaps_days|join(', ') }}</span></div>{% endif %}
+      {% if fd.note %}<div class="soc-row"><span class="muted">Note</span><span>{{ fd.note }}</span></div>{% endif %}
+      <div class="small muted">Checked {{ fd.checked_on or 'n/a' }}{% if fd.page %} · <a class="link" href="{{ fd.page }}" target="_blank" rel="noopener">open page</a>{% endif %}</div>
+    </div>
+    {% endif %}
+    <div class="small muted">{% if so.checked %}Links checked on the business website ({{ so.checked }}). {% endif %}Post activity comes from your checklist import: Facebook pages are reviewed in your own browser and summarised from their recent posting dates.</div>
+  </section>
+
+  <section class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+    <div>
+      <h2 style="margin-bottom:8px">Operating style</h2>
+      {% set st = ev.get('style') %}
+      <div style="font-size:22px;font-weight:600;color:var(--accent)">{{ ((st.value.style if st and st.value else 'unknown') or 'unknown')|replace('_', '-')|humanize }}</div>
+      <div class="prose" style="margin-top:6px">From non-marketing signals only{% if st and st.value and st.value.signals_used %} ({{ st.value.signals_used|join(', ')|replace('_', ' ') }}){% endif %}. Marketing signals are not used here.</div>
+    </div>
+    <div>
+      <h2 style="margin-bottom:8px">Marketing tools detected</h2>
+      {% set found = [] %}{% for k in ['pixels','cms','email_platform','chat_widget','booking_widget','crm_forms'] %}{% if ev.get(k) and ev[k].state in ('observed_yes','manually_verified') %}{% set _ = found.append(k) %}{% endif %}{% endfor %}
+      <div class="prose">{% if found %}{% for k in found %}<strong style="color:var(--ink)">{{ k|replace('cms', 'site software')|humanize }}</strong>{% if ev[k].value %}: {{ ev[k].value|fmt }}{% endif %}{{ '; ' if not loop.last }}{% endfor %}.{% else %}None found on the evidence so far.{% endif %}</div>
+    </div>
+  </section>
+
+  {% if v.links %}
+  <section class="card">
+    <div class="card-title"><h2>Identity</h2><span class="note">Merges are reversible</span></div>
+    <div class="kv">{% for l in v.links %}<div><span>{{ l.rule|humanize }}</span><span class="muted">match {{ '%.2f'|format(l.match_score) }}{% if l.undone_at %} · undone{% endif %}</span></div>{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+
+<aside class="col-side">
+  <section class="card" style="gap:12px">
+    <h2>Payback case</h2>
+    {% if v.audit and v.audit.payback %}{% set pb = v.audit.payback %}
+    <div class="score-line" style="gap:8px"><div class="big m">{{ pb.multiple_low }}x to {{ pb.multiple_high }}x</div>
+      <div class="small muted">of the monthly fee, one extra customer a month</div></div>
+    <div class="prose">Rule: one extra customer a month must be worth at least 2x the fee. Verdict: <strong style="color:var(--ink)">{{ pb.verdict }}</strong>.{% if pb.provisional %} Range is provisional until job values are confirmed.{% endif %}</div>
+    {% else %}<div class="prose">No payback case yet. It is built with the visibility audit for Class A and B.</div>{% endif %}
+  </section>
+
+  <section class="card" style="gap:10px">
+    <h2>Checks before outreach</h2>
+    <div class="kv">
+      {% for g in v.gates %}
+      <div><span>{{ g.gate|humanize }}{% if g.value is not none and g.threshold is not none %} ({{ '%.0f'|format(g.value) }} of {{ '%.0f'|format(g.threshold) }} needed){% endif %}</span>
+        {% if g.passed %}<span class="pass">Pass</span>{% else %}<span class="fail">{{ (g.reason or 'Fail')|humanize }}</span>{% endif %}</div>
+      {% else %}<div><span class="muted">No gate results yet</span></div>{% endfor %}
+      <div><span>Manual mystery check</span>
+        {% if v.mystery and v.mystery.passed %}<span class="pass">Passed {{ v.mystery.created_at.strftime('%Y-%m-%d') }}</span>
+        {% elif v.mystery %}<span class="fail">Failed</span>
+        {% elif s and s.cls == 'A' %}<span class="due">Due, Class A</span>
+        {% else %}<span class="dim">Not needed</span>{% endif %}</div>
+      <div><span>Eligible contact</span>
+        {% if v.contacts|selectattr('eligible')|list %}<span class="pass">Found</span>{% else %}<span class="due">None yet</span>{% endif %}</div>
+    </div>
+  </section>
+
+  <section class="card draft-card" style="gap:12px">
+    <h2>Recommended move</h2>
+    {% set d = v.drafts[0] if v.drafts else none %}
+    {% if d %}
+      <div style="font-size:13px;line-height:1.55"><strong>Channel:</strong> {{ d.channel }} · <strong>Status:</strong> {{ d.status }}
+        {% if d.subject %}<br><strong>Subject:</strong> {{ d.subject }}{% endif %}
+        <br><span class="muted">Cites {{ d.cited_evidence_ids|length }} evidence rows</span></div>
+      {% if d.blocked_reasons %}<div class="flash bad">Blocked by policy: {{ d.blocked_reasons|join(', ') }}</div>{% endif %}
+      <div id="dec-{{ d.id }}">
+      {% if d.status == 'draft' and user.can('approver') %}
+        <form hx-post="/drafts/{{ d.id }}/decision" hx-target="#dec-{{ d.id }}" style="display:flex;flex-direction:column;gap:10px">
+          <label class="small muted" for="body-{{ d.id }}">Draft opener, edit before sending</label>
+          <textarea id="body-{{ d.id }}" name="edited_body">{{ d.body }}</textarea>
+          <div class="btn-row">
+            <button class="primary btn-lg" name="decision" value="approve" style="flex:1 1 100%">Approve and queue</button>
+            <button class="btn-lg" name="decision" value="edit" style="flex:2 1 150px">Approve with edits</button>
+            <button class="btn-lg" name="decision" value="reject" style="flex:1 1 80px">Skip</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="draft-box"><div class="k">Draft opener</div>{{ d.body }}</div>
+      {% endif %}
+      </div>
+    {% else %}<div class="prose">No draft yet. Drafts are written after the audit, cite evidence, and wait here for your approval.</div>{% endif %}
+    {% if v.audit %}<a class="link" style="text-align:center;font-size:13px;padding:6px 0" href="/report/{{ v.audit.id }}" target="_blank">Preview the visibility report</a>{% endif %}
+  </section>
+
+  <section class="card" style="gap:10px">
+    <div class="card-title"><h2>Visibility audit</h2>{% if v.audit %}<span class="chip chip-sm {{ 'ok-chip' if v.audit.status == 'ready' else 'grey-chip' }}">{{ v.audit.status|humanize }}</span>{% endif %}</div>
+    {% if v.audit %}
+      <div class="btn-row"><a class="btn btn-sm" href="/report/{{ v.audit.id }}" target="_blank">Open report</a><a class="btn btn-sm" href="/report/{{ v.audit.id }}.pdf">Download PDF</a></div>
+      {% if v.audit.open_items %}<div class="small muted strong" style="margin-top:4px">Open items (kept out of the report)</div>
+        <div class="kv">{% for o in v.audit.open_items %}<div><span>{{ o.signal|humanize }}</span><span class="muted">{{ STATE_LABELS.get(o.state, o.state) }}{% if o.note %} · {{ o.note }}{% endif %}</span></div>{% endfor %}</div>{% endif %}
+    {% else %}<div class="prose">No audit yet. Audits are built for Class A and B.</div>{% endif %}
+  </section>
+
+  <section class="card" style="gap:10px">
+    <h2>Contacts</h2>
+    <div class="kv">
+    {% for c in v.contacts %}<div><span><strong>{{ c.name or c.role or 'Contact' }}</strong><br><span class="muted">{{ c.email or c.phone_e164 }}</span></span>
+      <span class="{{ 'pass' if c.eligible else 'dim' }}" style="text-align:right">{{ {'high': 'Verified', 'medium': 'Corroborated', 'low': 'Single source'}.get(c.confidence, c.confidence|humanize) }}<br><span class="small">{{ 'eligible' if c.eligible else 'not eligible' }}</span></span></div>
+    {% if c.source_url %}<div class="small muted" style="margin-top:-6px;word-break:break-all">Source: {{ c.source_url }}</div>{% endif %}
+    {% else %}<div><span class="muted">None found yet.</span></div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="card" style="gap:10px">
+    <h2>Mystery check</h2>
+    {% if v.mystery %}<div class="prose">Last: {{ 'passed' if v.mystery.passed else 'failed' }} by {{ v.mystery.user_id }} on {{ v.mystery.created_at.strftime('%Y-%m-%d') }}</div>{% endif %}
+    {% if user.can('approver') %}
+    <div id="mc"><form hx-post="/business/{{ b.id }}/mystery" hx-target="#mc" style="display:flex;flex-direction:column;gap:12px">
+      <div class="checks">
+        <label><input type="checkbox" name="searched" value="true"> Searched service and town</label>
+        <label><input type="checkbox" name="called" value="true"> Called the number</label>
+        <label><input type="checkbox" name="site_opened" value="true"> Opened the site</label>
+        <label><input type="checkbox" name="passed" value="true"> Findings confirmed</label>
+      </div>
+      <input name="notes" placeholder="Notes" aria-label="Notes">
+      <button class="primary">Record check</button>
+    </form></div>
+    {% else %}<div class="prose">An approver records this check.</div>{% endif %}
+  </section>
+</aside>
+</div>
+{% endblock %}

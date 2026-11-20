@@ -1,0 +1,92 @@
+# LeadBeast on one small VPS. `docker compose up -d`, then:
+#   docker compose run --rm app leadbeast db migrate
+#   docker compose run --rm app leadbeast init
+#   docker compose run --rm app leadbeast user add admin --role operator
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    LB_DATABASE_URL: postgresql+psycopg://lb:${POSTGRES_PASSWORD:-lb}@postgres:5432/lb
+    LB_OLLAMA_URL: http://ollama:11434
+    LB_NTFY_URL: http://ntfy
+  volumes: [reports:/app/var]
+  depends_on:
+    postgres: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: lb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lb}
+      POSTGRES_DB: lb
+    volumes: [pgdata:/var/lib/postgresql/data, ./deploy/initdb:/docker-entrypoint-initdb.d:ro]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lb -d lb"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    <<: *app
+    command: uvicorn leadbeast.api.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+
+  worker:
+    <<: *app
+    command: leadbeast jobs worker --concurrency 4
+
+  scheduler:
+    <<: *app
+    command: leadbeast jobs schedule
+
+  ollama:
+    image: ollama/ollama:0.3.14
+    volumes: [ollama:/root/.ollama]
+    profiles: ["ai"]          # optional: small VPSs may point LB_OLLAMA_URL at a hosted model
+    restart: unless-stopped
+
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    command: serve
+    volumes: [ntfy:/var/cache/ntfy]
+    restart: unless-stopped
+
+  espocrm:
+    image: espocrm/espocrm:8.4
+    environment:
+      ESPOCRM_DATABASE_PLATFORM: Postgresql
+      ESPOCRM_DATABASE_HOST: postgres
+      ESPOCRM_DATABASE_NAME: espocrm
+      ESPOCRM_DATABASE_USER: lb
+      ESPOCRM_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-lb}
+      ESPOCRM_ADMIN_USERNAME: admin
+      ESPOCRM_ADMIN_PASSWORD: ${ESPOCRM_ADMIN_PASSWORD:-change-me}
+      ESPOCRM_SITE_URL: https://${LB_DOMAIN:-localhost}/crm
+    volumes: [espocrm:/var/www/html]
+    depends_on: [postgres]
+    profiles: ["crm"]
+    restart: unless-stopped
+
+  metabase:
+    image: metabase/metabase:v0.50.30
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_HOST: postgres
+      MB_DB_USER: lb
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-lb}
+    depends_on: [postgres]
+    profiles: ["reports"]
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8
+    ports: ["80:80", "443:443"]
+    environment:
+      LB_DOMAIN: ${LB_DOMAIN:-localhost}
+    volumes: [./deploy/Caddyfile:/etc/caddy/Caddyfile:ro, caddy:/data]
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes: { pgdata: {}, ollama: {}, ntfy: {}, espocrm: {}, caddy: {}, reports: {} }
